@@ -1,30 +1,23 @@
-import { cookies } from "next/headers";
+import { auth, signOut}  from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
 export default async function DashboardPage() {
-    const cookieStore = await cookies();
-    const sessionToken = cookieStore.get('sessionToken');
+    const session = await auth();
 
-    if (!sessionToken) {
-        // redirect('/login');
+    if (!session) {
+        redirect('/login');
     }
 
-    const fetchUserData = async () => {
-        return {
-            // Will send this token to backed for validation and user info.
-            email: 'user@example.com',
-            name: 'Authenticated User',
-        };
-    };
-
-    const userData = await fetchUserData();
+    const userData = {
+        email: session.user?.email,
+        name: session.user?.name,
+    }
 
     const handleLogout = async () => {
-        'use server';
-        (await cookies()).delete('sessionToken');
-        redirect('/login');
+        'use server'
+        await signOut({redirect: true, callbackUrl: '/login'});
     };
 
     return (

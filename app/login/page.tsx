@@ -1,100 +1,103 @@
-"use client"
-
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@radix-ui/react-label";
+'use client';
+import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { set, z } from 'zod';
+import { signIn } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
+// Import your Shadcn UI components
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import Link from 'next/dist/client/link';
+
+// Define your validation schema
+const loginSchema = z.object({
+    email: z.email('Invalid email address'),
+    password: z.string().min(6, 'Password must be at least 6 characters'),
+});
 
 export default function LoginPage() {
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
     const [error, setError] = useState('');
-    const [loading, setLoading] = useState(false);
+
     const router = useRouter();
+    const form = useForm({
+        resolver: zodResolver(loginSchema),
+    });
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setError('');
-        setLoading(true);
-
+    const onSubmit = async (data: any) => {
         try {
-            const response = await fetch('/api/auth/login', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ email, password }),
+            setError(''); // Reset error state
+            const result = await signIn('credentials', {
+                redirect: false,
+                email: data.email,
+                password: data.password,
             });
 
-            const data = await response.json()
+            console.log('result:', result);
+            console.log('ok:', result?.ok, 'error:', result?.error);
 
-            if (response.ok && data.success) {
-                router.push('/dashboard'); // redirect to a protected dashboard page
+            if (result && result?.error) {
+                setError('Login failed. Invalid Credentials');
+                return;
+            } else if (result && result?.ok) {
+                router.push('/dashboard');
             } else {
-                setError(data.message || 'Login failed');
+                setError('An unexpected error occurred. Please try again.');
             }
-        } catch(err) {
+
+        } catch (err) {
             setError('An unexpected error occurred. Please try again.');
-            console.error('Client-side login error:', err);
-        } finally {
-            setLoading(false);
+            console.error('Login error:', err);
         }
-    }
+    };
 
     return (
         <div className="flex min-h-screen items-center justify-center bg-gray-100 p-4">
             <Card className="w-full max-w-md rounded-lg shadow-lg">
-                <CardHeader className="space-y-1 p-6">
-                    <CardTitle className="text-2xl font-bold text-center">Login</CardTitle>
-                    <CardDescription className="text-center text-gray-600">
-                        Enter your email below to log in to your account.
-                    </CardDescription>
+                <CardHeader className='space-y-1 p-6'>
+                    <CardTitle className='text-2xl font-bold text-center'>Login</CardTitle>
+                    <CardDescription className='text-center text-gray-600'>Enter your credentials to log in.</CardDescription>
                 </CardHeader>
-                <CardContent className="p-6 pt-0">
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="email">Eamil</Label>
-                            <Input 
+                <CardContent className='p-6 pt-0'>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                        <div className='space-y-2'>
+                            <Label htmlFor="email">Email</Label>
+                            <Input
                                 id="email"
                                 type="email"
-                                placeholder="you@example.com"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
+                                {...form.register('email')}
                                 required
-                                className="rounded-md"
-                                />
+                                className='rounded-md'
+                                placeholder='you@example.com'
+                            />
+                            {form.formState.errors.email && (
+                                <p className="text-red-500 text-sm mt-1">{form.formState.errors.email.message}</p>
+                            )}
                         </div>
-                        <div className="space-y-2">
+                        <div className='space-y-2'>
                             <Label htmlFor="password">Password</Label>
-                            <Input 
+                            <Input
                                 id="password"
                                 type="password"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
+                                {...form.register('password')}
                                 required
-                                className="rounded-md"
-                                />
+                                className='rounded-md'
+                            />
+                            {form.formState.errors.password && (
+                                <p className="text-red-500 text-sm mt-1">{form.formState.errors.password.message}</p>
+                            )}
                         </div>
-                        {/* error   goes here */}
                         {error && <p className="text-sm text-red-500 text-center">{error}</p>}
-                        <Button type="submit" className="w-full rounded-md" disabled={loading}>
-                            {loading ? 'Logging in...': 'Login'}
+
+                        <Button type="submit" className="w-full rounded-md" disabled={form.formState.isSubmitting}>
+                            Login
                         </Button>
-                        <p className="text-center text-sm text-gray-600">
-                            Don't have an account?{' '}
-                            <button
-                                type="button"
-                                onClick={() => router.push('/signup')}
-                                className="font-medium text-blue-600 hover:underline"
-                            >   
-                                Sign up
-                            </button>
-                        </p>
+                        <p className='text-sm text-center'>Don't have an account? <Link href="/signup" className="text-blue-500">Sign up</Link></p>
                     </form>
                 </CardContent>
             </Card>
         </div>
-    )
+    );
 }
