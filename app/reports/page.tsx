@@ -1,17 +1,14 @@
-// /app/dashboard/page.tsx
+// /app/reports/page.tsx
 // This is a Server Component
 
 import { auth } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 
-// Import the new shared layout component
+// Import the shared layout component and the content component
 import AuthenticatedLayout from '@/components/layout/AuthenticatedLayout';
+import ReportsContent from '@/components/content/ReportsContent';
 
-// Import the content component for the dashboard
-import DashboardContent from '@/components/content/DashboardContent';
-
-
-export default async function DashboardPage() {
+export default async function ReportsPage() {
   const session = await auth();
 
   // Redirect if no session exists (server-side check)
@@ -19,16 +16,16 @@ export default async function DashboardPage() {
     redirect('/login');
   }
 
-  // Pass necessary user data to the client component
+  // Prepare user data to pass to the layout
   const userData = {
     email: session.user.email,
     name: session.user.name || session.user.email?.split('@')[0], // Fallback for name
   };
 
   return (
-    // Wrap DashboardContent with the AuthenticatedLayout
+    // Wrap ReportsContent with the AuthenticatedLayout
     <AuthenticatedLayout userData={userData}>
-      <DashboardContent />
+      <ReportsContent /> {/* This component will display the reports section */}
     </AuthenticatedLayout>
   );
 }

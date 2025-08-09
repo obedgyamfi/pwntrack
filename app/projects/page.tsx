@@ -1,17 +1,16 @@
-// /app/dashboard/page.tsx
+// /app/projects/page.tsx
 // This is a Server Component
 
 import { auth } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 
-// Import the new shared layout component
+// Import the shared layout component
 import AuthenticatedLayout from '@/components/layout/AuthenticatedLayout';
 
-// Import the content component for the dashboard
-import DashboardContent from '@/components/content/DashboardContent';
+// Import the content component for displaying the list of projects
+import ProjectsContent from '@/components/content/ProjectsContent';
 
-
-export default async function DashboardPage() {
+export default async function ProjectsPage() {
   const session = await auth();
 
   // Redirect if no session exists (server-side check)
@@ -19,16 +18,16 @@ export default async function DashboardPage() {
     redirect('/login');
   }
 
-  // Pass necessary user data to the client component
+  // Pass necessary user data to the client component for the layout
   const userData = {
     email: session.user.email,
     name: session.user.name || session.user.email?.split('@')[0], // Fallback for name
   };
 
   return (
-    // Wrap DashboardContent with the AuthenticatedLayout
+    // Wrap ProjectsContent with the AuthenticatedLayout
     <AuthenticatedLayout userData={userData}>
-      <DashboardContent />
+      <ProjectsContent />
     </AuthenticatedLayout>
   );
 }
