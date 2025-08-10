@@ -3,12 +3,9 @@
 
 import { getProjectById, getFindingsByProjectId, Project, Finding } from '@/lib/dummy-data';
 import ProjectDetailContent from '@/components/content/ProjectDetailContent';
-import { notFound, redirect } from 'next/navigation'; // Import redirect
-import { auth } from '@/lib/auth'; // Import auth to check session
-
-// Import the new shared layout component
+import { notFound, redirect } from 'next/navigation';
+import { auth } from '@/lib/auth';
 import AuthenticatedLayout from '@/components/layout/AuthenticatedLayout';
-
 
 interface ProjectDetailPageProps {
   params: {
@@ -30,18 +27,24 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
   const { projectId } = params;
 
   // Fetch project and findings data on the server
-  const project: Project | undefined = await getProjectById(projectId);
+  const project = await getProjectById(projectId); // project will be Project | undefined
   const findings: Finding[] = await getFindingsByProjectId(projectId);
 
+  // If project is not found, trigger Next.js 404
   if (!project) {
-    // If project not found, display a 404 page
-    notFound();
+    notFound(); // This should theoretically stop execution here
   }
 
+  // Defensive measure: Explicitly assert that 'project' is of type 'Project'.
+  // This tells TypeScript (and potentially the runtime) that we guarantee 'project'
+  // is defined here, even if `notFound()` might not halt execution immediately
+  // in this specific environment.
+  const confirmedProject: Project = project as Project;
+
+
   return (
-    // Wrap ProjectDetailContent with the AuthenticatedLayout
     <AuthenticatedLayout userData={userData}>
-      <ProjectDetailContent project={project} initialFindings={findings} />
+      <ProjectDetailContent initialProject={confirmedProject} initialFindings={findings} />
     </AuthenticatedLayout>
   );
 }

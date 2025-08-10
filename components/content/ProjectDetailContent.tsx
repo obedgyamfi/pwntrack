@@ -1,7 +1,7 @@
-'use client'; // This component uses client-side hooks
+'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Project, Finding, addFinding, getFindingsByProjectId } from '@/lib/dummy-data'; // Import addFinding and getFindingsByProjectId
+import { Project, Finding, addFinding, getFindingsByProjectId, updateProject, getProjectById, updateFinding } from '@/lib/dummy-data'; // Import updateFinding
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -16,8 +16,8 @@ import {
 } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'; // For date picker
-import { Calendar } from '@/components/ui/calendar'; // For date picker
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 import {
   Dialog,
   DialogContent,
@@ -26,30 +26,35 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog'; // For add finding dialog
-import { Label } from '@/components/ui/label'; // For form labels
-import { Textarea } from '@/components/ui/textarea'; // For multi-line text input
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { format } from 'date-fns';
-import { CalendarIcon } from 'lucide-react'; // For calendar icon
+import { CalendarIcon, Edit, Plus } from 'lucide-react';
 
-// Ensure you have these Shadcn UI components installed:
-// npx shadcn-ui@latest add tabs badge table input select popover calendar dialog label textarea
+// Import reusable components
+import FindingDetailView from '@/components/content/FindingDetailView';
+import ProjectFormContent from '@/components/forms/ProjectFormDialog';
+import FindingFormContent from '@/components/forms/FindingFormContent'; // Import FindingFormContent
+
 
 interface ProjectDetailContentProps {
-  project: Project;
-  initialFindings: Finding[]; // Findings fetched by the server component
+  initialProject: Project;
+  initialFindings: Finding[];
 }
 
-const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ project, initialFindings }) => {
+const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ initialProject, initialFindings }) => {
+  const [project, setProject] = useState<Project>(initialProject);
   const [activeTab, setActiveTab] = useState('overview');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPeriod, setSelectedPeriod] = useState('');
-  const [findings, setFindings] = useState<Finding[]>(initialFindings); // Use state to manage findings, initialized from props
-  const [loadingFindings, setLoadingFindings] = useState(false); // Loading state specifically for findings tab
+  const [findings, setFindings] = useState<Finding[]>(initialFindings);
+  const [loadingFindings, setLoadingFindings] = useState(false);
 
-  // State for "Add New Finding" dialog
-  const [isAddFindingDialogOpen, setIsAddFindingDialogOpen] = useState(false);
-  const [newFindingFormData, setNewFindingFormData] = useState<Omit<Finding, 'id' | 'reportedDate'>>({
+  // States for "Add/Edit Finding" dialog
+  const [isFindingFormDialogOpen, setIsFindingFormDialogOpen] = useState(false); // New state for dialog
+  const [editingFinding, setEditingFinding] = useState<Finding | undefined>(undefined); // New state for editing finding
+  const [findingFormData, setFindingFormData] = useState<Omit<Finding, 'id' | 'reportedDate'>>({
     projectId: project.id, // Pre-fill with current project's ID
     title: '',
     severity: 'Medium',
@@ -59,11 +64,73 @@ const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ project, in
     assessmentPeriod: '',
     notes: '',
   });
-  const [newFindingReportedDate, setNewFindingReportedDate] = useState<Date | undefined>(new Date());
-  const [addingFinding, setAddingFinding] = useState(false); // Loading state for adding a finding
+  const [findingReportedDate, setFindingReportedDate] = useState<Date | undefined>(new Date());
+  const [isSavingFinding, setIsSavingFinding] = useState(false); // Loading state for saving/updating finding
 
-  // Fetch findings for this project whenever the component mounts or project changes (shouldn't change much here)
-  // or after a new finding is added.
+  // States for "View Finding" dialog
+  const [isViewFindingDialogOpen, setIsViewFindingDialogOpen] = useState(false);
+  const [selectedFinding, setSelectedFinding] = useState<Finding | null>(null);
+
+  // States for "Edit Project" dialog
+  const [isEditProjectDialogOpen, setIsEditProjectDialogOpen] = useState(false);
+  const [isSavingProject, setIsSavingProject] = useState(false);
+
+  // State for the project form data within ProjectDetailContent (for editing current project)
+  const [projectFormData, setProjectFormData] = useState<Omit<Project, 'id'>>({
+    name: '',
+    scope: '',
+    methodology: '',
+    client: '',
+    startDate: undefined,
+    endDate: undefined,
+    status: 'Planning',
+  });
+
+  // Effect to update project and projectFormData states if initialProject prop changes
+  useEffect(() => {
+    setProject(initialProject);
+    setProjectFormData({
+        name: initialProject.name || '',
+        scope: initialProject.scope || '',
+        methodology: initialProject.methodology || '',
+        client: initialProject.client || '',
+        startDate: initialProject.startDate,
+        endDate: initialProject.endDate,
+        status: initialProject.status || 'Planning',
+    });
+  }, [initialProject]);
+
+  // Effect to update finding form data when editingFinding changes (for pre-filling form)
+  useEffect(() => {
+    if (editingFinding) {
+      setFindingFormData({
+        projectId: editingFinding.projectId,
+        title: editingFinding.title,
+        severity: editingFinding.severity,
+        status: editingFinding.status,
+        affectedEndpoints: editingFinding.affectedEndpoints,
+        description: editingFinding.description,
+        assessmentPeriod: editingFinding.assessmentPeriod,
+        notes: editingFinding.notes,
+      });
+      setFindingReportedDate(editingFinding.reportedDate);
+    } else {
+      // Reset form if no editingFinding (for "Add New") but keep projectId
+      setFindingFormData(prev => ({
+        ...prev,
+        title: '',
+        severity: 'Medium',
+        status: 'New',
+        affectedEndpoints: [],
+        description: '',
+        assessmentPeriod: '',
+        notes: '',
+      }));
+      setFindingReportedDate(new Date());
+    }
+  }, [editingFinding, isFindingFormDialogOpen, project.id]); // Add project.id to dependencies
+
+  // Fetch findings for this project whenever needed (e.g., component mount, after add/edit finding)
   const fetchProjectFindings = useCallback(async () => {
     setLoadingFindings(true);
     try {
@@ -71,12 +138,10 @@ const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ project, in
       setFindings(updatedFindings);
     } catch (error) {
       console.error("Failed to fetch updated findings for project:", error);
-      // Handle error display
     } finally {
       setLoadingFindings(false);
     }
-  }, [project.id]); // Re-create if project ID changes
-
+  }, [project.id]);
 
   // Get unique assessment periods for filtering
   const uniquePeriods = Array.from(new Set(findings.map(f => f.assessmentPeriod)));
@@ -90,7 +155,7 @@ const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ project, in
     return matchesSearch && matchesPeriod;
   });
 
-  // Helper for severity badge styling
+  // Helper function for styling severity badges
   const getSeverityBadgeClass = (severity: Finding['severity']) => {
     switch (severity) {
       case 'Critical': return 'bg-destructive text-destructive-foreground';
@@ -102,10 +167,10 @@ const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ project, in
     }
   };
 
-  // Handlers for New Finding form
-  const handleNewFindingInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  // Handlers for New/Edit Finding form
+  const handleFindingInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { id, value } = e.target;
-    setNewFindingFormData(prev => {
+    setFindingFormData(prev => {
       if (id === 'affectedEndpoints') {
         return { ...prev, affectedEndpoints: value.split(',').map(item => item.trim()).filter(item => item !== '') };
       }
@@ -113,47 +178,116 @@ const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ project, in
     });
   };
 
-  const handleNewFindingSelectChange = (id: keyof Omit<Finding, 'id' | 'reportedDate'>, value: string) => {
-    setNewFindingFormData(prev => ({ ...prev, [id]: value as any }));
+  const handleFindingSelectChange = (id: keyof Omit<Finding, 'id' | 'reportedDate'>, value: string) => {
+    setFindingFormData(prev => ({ ...prev, [id]: value as any }));
   };
 
-  const handleSaveNewFinding = async () => {
-    if (!newFindingFormData.title.trim()) { // ProjectId is already pre-filled and not changeable here
+  const handleFindingDateChange = (date: Date | undefined) => {
+    setFindingReportedDate(date);
+  };
+
+  const handleSaveFinding = async () => {
+    if (!findingFormData.title.trim()) {
       console.error("Finding title cannot be empty.");
       return;
     }
 
+    setIsSavingFinding(true);
     try {
-      setAddingFinding(true);
-      const fullNewFinding: Omit<Finding, 'id'> = {
-        ...newFindingFormData,
-        reportedDate: newFindingReportedDate || new Date(),
+      const fullFindingData: Omit<Finding, 'id'> = {
+        ...findingFormData,
+        reportedDate: findingReportedDate || new Date(),
       };
-      const savedFinding = await addFinding(fullNewFinding);
-      console.log('Finding saved via dummy API:', savedFinding);
 
-      await fetchProjectFindings(); // Re-fetch findings for THIS project
-      setIsAddFindingDialogOpen(false); // Close dialog
+      if (editingFinding) {
+        const updated = await updateFinding(editingFinding.id, fullFindingData);
+        if (updated) {
+          console.log('Finding updated via dummy API:', updated);
+        } else {
+          throw new Error('Finding not found for update.');
+        }
+      } else {
+        const saved = await addFinding(fullFindingData);
+        console.log('Finding added via dummy API:', saved);
+      }
 
-      // Reset form (except projectId)
-      setNewFindingFormData(prev => ({
-        ...prev,
-        title: '',
-        severity: 'Medium',
-        status: 'New',
-        affectedEndpoints: [],
-        description: '',
-        assessmentPeriod: '',
-        notes: '',
-      }));
-      setNewFindingReportedDate(new Date());
+      await fetchProjectFindings(); // Re-fetch findings for THIS project to update the list
+      setIsFindingFormDialogOpen(false); // Close dialog
+      setEditingFinding(undefined); // Clear editing state
+
     } catch (err) {
-      console.error("Failed to save finding:", err);
+      console.error("Failed to save/update finding:", err);
       // Handle error display
     } finally {
-      setAddingFinding(false);
+      setIsSavingFinding(false);
     }
   };
+
+  // Function to open the "View Finding" dialog
+  const handleViewFinding = (finding: Finding) => {
+    setSelectedFinding(finding);
+    setIsViewFindingDialogOpen(true);
+  };
+
+  // Function to open the "Add New Finding" dialog (pre-fills project)
+  const handleAddFindingClick = () => {
+    setEditingFinding(undefined); // Clear any existing editing context
+    setFindingFormData(prev => ({ ...prev, projectId: project.id })); // Ensure project ID is set
+    setFindingReportedDate(new Date()); // Reset date
+    setIsFindingFormDialogOpen(true);
+  };
+
+  // Function to open the "Edit Finding" dialog
+  const handleEditFindingClick = (findingToEdit: Finding) => {
+    setEditingFinding(findingToEdit); // Set the finding data for the form
+    setIsFindingFormDialogOpen(true); // Open the dialog
+  };
+
+  // Handlers for editing project details (from ProjectFormContent)
+  const handleProjectInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { id, value } = e.target;
+    setProjectFormData(prev => ({ ...prev, [id]: value }));
+  };
+
+  const handleProjectSelectChange = (id: string, value: string) => {
+    setProjectFormData(prev => ({ ...prev, [id]: value }));
+  };
+
+  const handleProjectDateChange = (id: string, date: Date | undefined) => {
+    setProjectFormData(prev => ({ ...prev, [id]: date }));
+  };
+
+  const handleSaveProject = async () => {
+    if (!projectFormData.name.trim()) {
+      console.error("Project name cannot be empty.");
+      return;
+    }
+    setIsSavingProject(true);
+    try {
+      const updated = await updateProject(project.id, projectFormData);
+      if (updated) {
+        console.log('Project updated via dummy API:', updated);
+        setProject(updated); // Update local state with the new project data
+      } else {
+        throw new Error('Project not found for update.');
+      }
+      setIsEditProjectDialogOpen(false);
+    } catch (err) {
+      console.error("Failed to update project:", err);
+    } finally {
+      setIsSavingProject(false);
+    }
+  };
+
+  const projectDialogTitle = "Edit Project";
+  const projectDialogDescription = `Edit the details for "${project.name}".`;
+  const projectSubmitButtonText = "Save Changes";
+
+  const findingDialogTitle = editingFinding ? 'Edit Finding' : `Add New Finding to "${project.name}"`;
+  const findingDialogDescription = editingFinding
+    ? `Edit the details for "${editingFinding.title}".`
+    : 'Enter the details for the new vulnerability finding.';
+  const findingSubmitButtonText = editingFinding ? 'Save Changes' : 'Add Finding';
 
 
   return (
@@ -163,178 +297,62 @@ const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ project, in
 
       {/* Action Buttons for the project */}
       <div className="flex gap-2">
-        <Button variant="outline">Edit Project</Button>
-
-        {/* Dialog Trigger for Add New Finding */}
-        <Dialog open={isAddFindingDialogOpen} onOpenChange={setIsAddFindingDialogOpen}>
+        {/* Edit Project Button and Dialog Trigger */}
+        <Dialog open={isEditProjectDialogOpen} onOpenChange={setIsEditProjectDialogOpen}>
           <DialogTrigger asChild>
-            <Button>Add New Finding</Button>
+            <Button variant="outline" onClick={() => setIsEditProjectDialogOpen(true)}>
+              <Edit className="h-4 w-4 mr-1" /> Edit Project
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[600px]">
+            <DialogHeader>
+              <DialogTitle>{projectDialogTitle}</DialogTitle>
+              <DialogDescription>{projectDialogDescription}</DialogDescription>
+            </DialogHeader>
+            <ProjectFormContent
+              formData={projectFormData}
+              handleInputChange={handleProjectInputChange}
+              handleSelectChange={handleProjectSelectChange}
+              handleDateChange={handleProjectDateChange}
+            />
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsEditProjectDialogOpen(false)} disabled={isSavingProject}>
+                Cancel
+              </Button>
+              <Button onClick={handleSaveProject} disabled={!projectFormData.name.trim() || isSavingProject}>
+                {isSavingProject ? 'Saving Changes...' : projectSubmitButtonText}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Add/Edit Finding Dialog Trigger (for project-specific findings) */}
+        <Dialog open={isFindingFormDialogOpen} onOpenChange={setIsFindingFormDialogOpen}>
+          <DialogTrigger asChild>
+            <Button onClick={handleAddFindingClick}>
+              <Plus className="mr-2 h-4 w-4" /> Add New Finding
+            </Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-[700px]">
             <DialogHeader>
-              <DialogTitle>Add New Finding to "{project.name}"</DialogTitle>
-              <DialogDescription>
-                Enter the details for the new vulnerability finding.
-              </DialogDescription>
+              <DialogTitle>{findingDialogTitle}</DialogTitle>
+              <DialogDescription>{findingDialogDescription}</DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
-              {/* Associated Project (Displayed but disabled/read-only) */}
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="projectId" className="text-right">
-                  Project
-                </Label>
-                <Input
-                  id="projectId"
-                  value={project.name} // Display project name
-                  className="col-span-3 bg-muted"
-                  readOnly // Make it read-only
-                />
-                {/* Hidden input for the actual projectId value if needed by form submission logic */}
-                <input type="hidden" name="projectId" value={project.id} />
-              </div>
-
-              {/* Title */}
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="title" className="text-right">
-                  Title
-                </Label>
-                <Input
-                  id="title"
-                  value={newFindingFormData.title}
-                  onChange={handleNewFindingInputChange}
-                  className="col-span-3"
-                  placeholder="e.g., SQL Injection in Login"
-                />
-              </div>
-
-              {/* Severity */}
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="severity" className="text-right">
-                  Severity
-                </Label>
-                <Select onValueChange={(value) => handleNewFindingSelectChange('severity', value)} value={newFindingFormData.severity}>
-                  <SelectTrigger id="severity" className="col-span-3">
-                    <SelectValue placeholder="Select severity" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Critical">Critical</SelectItem>
-                    <SelectItem value="High">High</SelectItem>
-                    <SelectItem value="Medium">Medium</SelectItem>
-                    <SelectItem value="Low">Low</SelectItem>
-                    <SelectItem value="Informational">Informational</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Status */}
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="status" className="text-right">
-                  Status
-                </Label>
-                <Select onValueChange={(value) => handleNewFindingSelectChange('status', value)} value={newFindingFormData.status}>
-                  <SelectTrigger id="status" className="col-span-3">
-                    <SelectValue placeholder="Select status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="New">New</SelectItem>
-                    <SelectItem value="Triaged">Triaged</SelectItem>
-                    <SelectItem value="Reported">Reported</SelectItem>
-                    <SelectItem value="Fixed">Fixed</SelectItem>
-                    <SelectItem value="Pending Fix">Pending Fix</SelectItem>
-                    <SelectItem value="Closed">Closed</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Affected Endpoints */}
-              <div className="grid grid-cols-4 items-start gap-4">
-                <Label htmlFor="affectedEndpoints" className="text-right pt-2">
-                  Affected Endpoints
-                </Label>
-                <Textarea
-                  id="affectedEndpoints"
-                  value={newFindingFormData.affectedEndpoints.join(', ')}
-                  onChange={handleNewFindingInputChange}
-                  className="col-span-3"
-                  placeholder="e.g., /api/login, /admin/users, /dashboard (comma-separated)"
-                />
-              </div>
-
-              {/* Description */}
-              <div className="grid grid-cols-4 items-start gap-4">
-                <Label htmlFor="description" className="text-right pt-2">
-                  Description
-                </Label>
-                <Textarea
-                  id="description"
-                  value={newFindingFormData.description}
-                  onChange={handleNewFindingInputChange}
-                  className="col-span-3 min-h-[80px]"
-                  placeholder="Detailed explanation of the vulnerability, including technical background and impact."
-                />
-              </div>
-
-              {/* Reported Date */}
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="reportedDate" className="text-right">
-                  Reported Date
-                </Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant={"outline"}
-                      className={`col-span-3 w-full justify-start text-left font-normal ${!newFindingReportedDate && "text-muted-foreground"}`}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {newFindingReportedDate ? format(newFindingReportedDate, "PPP") : <span>Pick a date</span>}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={newFindingReportedDate}
-                      onSelect={setNewFindingReportedDate}
-                      autoFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-
-              {/* Assessment Period */}
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="assessmentPeriod" className="text-right">
-                  Assessment Period
-                </Label>
-                <Input
-                  id="assessmentPeriod"
-                  value={newFindingFormData.assessmentPeriod}
-                  onChange={handleNewFindingInputChange}
-                  className="col-span-3"
-                  placeholder="e.g., Q1 2025 Assessment, May 2025 Retest"
-                />
-              </div>
-
-              {/* Notes */}
-              <div className="grid grid-cols-4 items-start gap-4">
-                <Label htmlFor="notes" className="text-right pt-2">
-                  Notes
-                </Label>
-                <Textarea
-                  id="notes"
-                  value={newFindingFormData.notes}
-                  onChange={handleNewFindingInputChange}
-                  className="col-span-3 min-h-[60px]"
-                  placeholder="Any private notes, research links, or internal comments about this finding."
-                />
-              </div>
-
-            </div>
+            <FindingFormContent
+              formData={findingFormData}
+              reportedDate={findingReportedDate}
+              handleInputChange={handleFindingInputChange}
+              handleSelectChange={handleFindingSelectChange}
+              handleDateChange={handleFindingDateChange}
+              availableProjects={[project]} // Only the current project is available here
+              isProjectFieldDisabled={true} // Disable project selection
+            />
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsAddFindingDialogOpen(false)} disabled={addingFinding}>
+              <Button variant="outline" onClick={() => setIsFindingFormDialogOpen(false)} disabled={isSavingFinding}>
                 Cancel
               </Button>
-              <Button onClick={handleSaveNewFinding} disabled={!newFindingFormData.title.trim() || addingFinding}>
-                {addingFinding ? 'Adding...' : 'Add Finding'}
+              <Button onClick={handleSaveFinding} disabled={!findingFormData.title.trim() || !findingFormData.projectId || isSavingFinding}>
+                {isSavingFinding ? (editingFinding ? 'Saving Changes...' : 'Adding...') : findingSubmitButtonText}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -373,8 +391,8 @@ const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ project, in
               <div>
                 <h4 className="font-semibold">Dates:</h4>
                 <p className="text-muted-foreground">
-                  Start: {project.startDate ? format(project.startDate, 'PPP') : 'N/A'} |
-                  End: {project.endDate ? format(project.endDate, 'PPP') : 'N/A'}
+                  Start: {project.startDate ? format(project.startDate, "PPP") : 'N/A'} |
+                  End: {project.endDate ? format(project.endDate, "PPP") : 'N/A'}
                 </p>
               </div>
               <div>
@@ -405,6 +423,7 @@ const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ project, in
                     <SelectValue placeholder="Filter by Period" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="all">All Periods</SelectItem>
                     {uniquePeriods.map(period => (
                       <SelectItem key={period} value={period}>{period}</SelectItem>
                     ))}
@@ -443,10 +462,13 @@ const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ project, in
                         <TableCell className="text-sm max-w-[150px] overflow-hidden text-ellipsis whitespace-nowrap">
                           {finding.affectedEndpoints.join(', ')}
                         </TableCell>
-                        <TableCell>{format(finding.reportedDate, 'MMM d, yyyy')}</TableCell>
+                        <TableCell>{format(finding.reportedDate, "PPP")}</TableCell>
                         <TableCell>{finding.assessmentPeriod}</TableCell>
                         <TableCell className="text-right">
-                          <Button variant="ghost" size="sm">View</Button>
+                          <Button variant="ghost" size="sm" onClick={() => handleViewFinding(finding)}>View</Button>
+                          <Button variant="ghost" size="sm" onClick={() => handleEditFindingClick(finding)}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -485,6 +507,27 @@ const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ project, in
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* View Finding Details Dialog (for Project Detail Page) */}
+      <Dialog open={isViewFindingDialogOpen} onOpenChange={setIsViewFindingDialogOpen}>
+        <DialogContent className="sm:max-w-[800px]">
+          <DialogHeader>
+            <DialogTitle>{selectedFinding?.title || 'Finding Details'}</DialogTitle>
+            <DialogDescription>
+              Comprehensive information about this vulnerability.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedFinding && (
+            <FindingDetailView
+              finding={selectedFinding}
+              projectName={project.name}
+            />
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsViewFindingDialogOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

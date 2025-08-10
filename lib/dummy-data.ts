@@ -32,13 +32,10 @@ export interface Report {
   title: string;
   type: 'Executive Summary' | 'Technical Report' | 'Remediation Plan' | 'Other';
   generatedDate: Date;
-  // In a real app, this would be a URL or reference to the actual report file
-  // For now, it can be a description or a mock download link
   contentSummary: string;
 }
 
 // --- In-Memory Data Stores ---
-// Using '_' prefix to denote these are internal, mutable arrays
 const _projects: Project[] = [
   {
     id: 'proj-1',
@@ -57,7 +54,7 @@ const _projects: Project[] = [
     methodology: 'White-box',
     client: 'Internal IT',
     startDate: new Date('2025-03-01'),
-    endDate: undefined, // Example of undefined end date for active project
+    endDate: undefined,
     status: 'Active',
   },
   {
@@ -180,6 +177,17 @@ export async function addProject(newProjectData: Omit<Project, 'id'>): Promise<P
   return newProject;
 }
 
+export async function updateProject(id: string, updatedData: Partial<Omit<Project, 'id'>>): Promise<Project | undefined> {
+  await simulateDelay();
+  const index = _projects.findIndex(p => p.id === id);
+  if (index !== -1) {
+    _projects[index] = { ..._projects[index], ...updatedData };
+    return _projects[index];
+  }
+  return undefined;
+}
+
+
 // Finding operations
 export async function getFindings(): Promise<Finding[]> {
   await simulateDelay();
@@ -204,6 +212,16 @@ export async function addFinding(newFindingData: Omit<Finding, 'id'>): Promise<F
   };
   _findings.push(newFinding);
   return newFinding;
+}
+
+export async function updateFinding(id: string, updatedData: Partial<Omit<Finding, 'id'>>): Promise<Finding | undefined> {
+  await simulateDelay();
+  const index = _findings.findIndex(f => f.id === id);
+  if (index !== -1) {
+    _findings[index] = { ..._findings[index], ...updatedData };
+    return _findings[index];
+  }
+  return undefined;
 }
 
 // Report operations
