@@ -1,10 +1,66 @@
-'use client';
-import React from 'react';
+'use client'; // This component uses client-side hooks
+
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { FileText } from 'lucide-react';
+import { FileText, Download } from 'lucide-react'; // Added Download icon
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'; // For reports table
+import { getReports, Report, getProjects } from '@/lib/dummy-data'; // Import API functions and types
+import { format } from 'date-fns';
 
 const ReportsContent = () => {
+  const [reports, setReports] = useState<Report[]>([]);
+  const [projectsMap, setProjectsMap] = useState<Map<string, string>>(new Map()); // Map projectId to projectName
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchReportsAndProjects = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const fetchedReports = await getReports();
+      setReports(fetchedReports);
+
+      const fetchedProjects = await getProjects();
+      const map = new Map<string, string>();
+      fetchedProjects.forEach(p => map.set(p.id, p.name));
+      setProjectsMap(map);
+
+    } catch (err) {
+      console.error("Failed to fetch reports:", err);
+      setError("Failed to load reports.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchReportsAndProjects();
+  }, [fetchReportsAndProjects]);
+
+  if (loading) {
+    return (
+      <div className="p-6 space-y-6 flex items-center justify-center min-h-[500px]">
+        <p className="text-muted-foreground">Loading reports...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6 space-y-6 flex items-center justify-center min-h-[500px]">
+        <p className="text-destructive">Error: {error}</p>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 space-y-6">
       <h1 className="text-3xl font-bold">Reports</h1>
@@ -16,13 +72,48 @@ const ReportsContent = () => {
           <CardDescription>Access your previously created reports.</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="text-muted-foreground h-48 flex items-center justify-center border rounded-md">
-            (Placeholder for Reports List)
-          </div>
+          {reports.length === 0 ? (
+            <div className="text-muted-foreground h-48 flex items-center justify-center border rounded-md">
+              No reports generated yet.
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Report Title</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Project</TableHead>
+                  <TableHead>Generated Date</TableHead>
+                  <TableHead>Summary</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {reports.map((report) => (
+                  <TableRow key={report.id}>
+                    <TableCell className="font-medium">{report.title}</TableCell>
+                    <TableCell>{report.type}</TableCell>
+                    <TableCell>{report.projectId ? projectsMap.get(report.projectId) : 'General'}</TableCell>
+                    <TableCell>{format(report.generatedDate, 'MMM d, yyyy')}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground max-w-xs overflow-hidden text-ellipsis whitespace-nowrap">
+                      {report.contentSummary}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="sm">
+                        <Download className="h-4 w-4 mr-1" /> View/Download
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
     </div>
   );
 };
-ReportsContent.icon = FileText;
+
+ReportsContent.icon = FileText; // Ensure the icon is exported
+
 export default ReportsContent;

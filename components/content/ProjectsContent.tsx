@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react'; // Import useCallback
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Plus, Folder, CalendarIcon } from 'lucide-react';
@@ -22,25 +22,16 @@ import { Calendar } from '@/components/ui/calendar';
 import { format } from 'date-fns';
 import Link from 'next/link';
 
-// import the porject type from dummy-data 
-import { Project } from '@/lib/dummy-data';
-// Define a type for a Project object for better type safety
-// interface Project {
-//   id: string; // Unique ID for each project
-//   name: string;
-//   scope: string;
-//   methodology: string;
-//   client: string;
-//   startDate?: Date;
-//   endDate?: Date;
-//   status: string;
-// }
+// Import the Project type and API functions
+import { Project, getProjects, addProject } from '@/lib/dummy-data';
 
 const ProjectsContent = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  // State to hold all projects, initialized as an empty array
   const [projects, setProjects] = useState<Project[]>([]);
-  const [formData, setFormData] = useState<Omit<Project, 'id'>>({ // Omit 'id' as it's generated on save
+  const [loading, setLoading] = useState(true); // New loading state
+  const [error, setError] = useState<string | null>(null); // New error state
+
+  const [formData, setFormData] = useState<Omit<Project, 'id'>>({
     name: '',
     scope: '',
     methodology: '',
@@ -50,42 +41,25 @@ const ProjectsContent = () => {
     status: 'Planning',
   });
 
-  React.useEffect(() => {
-    // Simulate fetching projects
-    const dummyProjects = [
-      {
-        id: 'proj-1',
-        name: 'Acme Corp Web Application',
-        scope: 'Public-facing web application at acme.com. Focus on authentication, user management, and payment processing.',
-        methodology: 'Grey-box',
-        client: 'Acme Corp',
-        startDate: new Date('2025-01-15'),
-        endDate: new Date('2025-02-28'),
-        status: 'Completed',
-      },
-      {
-        id: 'proj-2',
-        name: 'Internal HR System Audit',
-        scope: 'Internal web application for HR data management. All features in scope.',
-        methodology: 'White-box',
-        client: 'Internal IT',
-        startDate: new Date('2025-03-01'),
-        endDate: undefined,
-        status: 'Active',
-      },
-      {
-        id: 'proj-3',
-        name: 'Mobile App V2 Assessment',
-        scope: 'iOS and Android mobile applications (versions 2.0.0 and above). APIs at api.acme.com/v2 included.',
-        methodology: 'Black-box',
-        client: 'Acme Corp',
-        startDate: new Date('2025-04-10'),
-        endDate: undefined,
-        status: 'Planning',
-      },
-    ];
-    setProjects(dummyProjects);
-  }, []);
+  // Function to fetch projects
+  const fetchProjects = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const fetchedProjects = await getProjects();
+      setProjects(fetchedProjects);
+    } catch (err) {
+      console.error("Failed to fetch projects:", err);
+      setError("Failed to load projects.");
+    } finally {
+      setLoading(false);
+    }
+  }, []); // Empty dependency array means this function is stable and won't re-create unnecessarily
+
+  // Fetch projects on component mount
+  useEffect(() => {
+    fetchProjects();
+  }, [fetchProjects]); // Depend on fetchProjects
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { id, value } = e.target;
@@ -100,34 +74,39 @@ const ProjectsContent = () => {
     setFormData(prev => ({ ...prev, [id]: date }));
   };
 
-  const handleSaveNewProject = () => {
+  const handleSaveNewProject = async () => {
     if (!formData.name.trim()) {
       console.error("Project name cannot be empty.");
+      // You might want to show a toast or validation message to the user
       return;
     }
 
-    // Create a new project object with a unique ID (for now, a simple timestamp)
-    const newProject: Project = {
-      id: `proj-${Date.now()}`, // Simple unique ID for in-memory
-      ...formData,
-    };
+    try {
+      setLoading(true); // Indicate saving is in progress
+      const savedProject = await addProject(formData); // Call the fake API to add
+      console.log('Project saved via dummy API:', savedProject);
 
-    // Add the new project to the projects array
-    setProjects(prevProjects => [...prevProjects, newProject]);
+      // Re-fetch all projects to update the list, or directly add to state
+      // Re-fetching is safer as it reflects the "source of truth"
+      await fetchProjects(); // Re-fetch all projects after adding
+      setIsDialogOpen(false); // Close dialog
 
-    console.log('New project added:', newProject);
-
-    // Reset form and close dialog
-    setFormData({
-      name: '',
-      scope: '',
-      methodology: '',
-      client: '',
-      startDate: undefined,
-      endDate: undefined,
-      status: 'Planning',
-    });
-    setIsDialogOpen(false);
+      // Reset form
+      setFormData({
+        name: '',
+        scope: '',
+        methodology: '',
+        client: '',
+        startDate: undefined,
+        endDate: undefined,
+        status: 'Planning',
+      });
+    } catch (err) {
+      console.error("Failed to save project:", err);
+      setError("Failed to save project. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -285,11 +264,11 @@ const ProjectsContent = () => {
 
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={loading}>
               Cancel
             </Button>
-            <Button onClick={handleSaveNewProject} disabled={!formData.name.trim()}>
-              Save Project
+            <Button onClick={handleSaveNewProject} disabled={!formData.name.trim() || loading}>
+              {loading ? 'Saving...' : 'Save Project'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -302,7 +281,15 @@ const ProjectsContent = () => {
           <CardDescription>Overview of your active and completed projects.</CardDescription>
         </CardHeader>
         <CardContent>
-          {projects.length === 0 ? (
+          {loading ? (
+            <div className="text-muted-foreground h-48 flex items-center justify-center border rounded-md">
+              Loading projects...
+            </div>
+          ) : error ? (
+            <div className="text-destructive h-48 flex items-center justify-center border rounded-md">
+              Error: {error}
+            </div>
+          ) : projects.length === 0 ? (
             <div className="text-muted-foreground h-48 flex items-center justify-center border rounded-md">
               No projects added yet. Click "Add New Project" to get started!
             </div>
@@ -317,7 +304,6 @@ const ProjectsContent = () => {
                       Starts: {project.startDate ? format(project.startDate, 'MMM d, yyyy') : 'N/A'} | Ends: {project.endDate ? format(project.endDate, 'MMM d, yyyy') : 'N/A'}
                     </p>
                   </div>
-                  {/* Link to the dedicated project detail page */}
                   <Link href={`/projects/${project.id}`} passHref>
                     <Button variant="outline" size="sm">View Details</Button>
                   </Link>

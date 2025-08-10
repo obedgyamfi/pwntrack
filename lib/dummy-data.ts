@@ -1,18 +1,18 @@
 // /lib/dummy-data.ts
 
-// Define a type for a Project object
+// --- Interfaces (Data Models) ---
+
 export interface Project {
-  id: string;
+  id: string; // Unique ID for each project
   name: string;
   scope: string;
   methodology: string;
   client: string;
-  startDate: Date | undefined;
-  endDate: Date | undefined;
-  status: string;
+  startDate?: Date;
+  endDate?: Date;
+  status: 'Planning' | 'Active' | 'Review' | 'Completed' | 'Archived';
 }
 
-// Define a type for a Finding object (simplified for now)
 export interface Finding {
   id: string;
   projectId: string; // Link to the project
@@ -23,10 +23,23 @@ export interface Finding {
   description: string;
   reportedDate: Date;
   assessmentPeriod: string; // e.g., "Q1 2025 Assessment" or "May 2025"
+  notes: string; // Add notes field for findings
 }
 
-// In-memory array to store projects
-const projects: Project[] = [
+export interface Report {
+  id: string;
+  projectId?: string; // Optional: Link to a specific project if report is project-specific
+  title: string;
+  type: 'Executive Summary' | 'Technical Report' | 'Remediation Plan' | 'Other';
+  generatedDate: Date;
+  // In a real app, this would be a URL or reference to the actual report file
+  // For now, it can be a description or a mock download link
+  contentSummary: string;
+}
+
+// --- In-Memory Data Stores ---
+// Using '_' prefix to denote these are internal, mutable arrays
+const _projects: Project[] = [
   {
     id: 'proj-1',
     name: 'Acme Corp Web Application',
@@ -44,7 +57,7 @@ const projects: Project[] = [
     methodology: 'White-box',
     client: 'Internal IT',
     startDate: new Date('2025-03-01'),
-    endDate: undefined,
+    endDate: undefined, // Example of undefined end date for active project
     status: 'Active',
   },
   {
@@ -59,8 +72,7 @@ const projects: Project[] = [
   },
 ];
 
-// In-memory array to store findings
-const findings: Finding[] = [
+const _findings: Finding[] = [
   {
     id: 'find-101',
     projectId: 'proj-1',
@@ -71,6 +83,7 @@ const findings: Finding[] = [
     description: 'A classic SQL injection vulnerability was found in the username parameter of the login form, allowing unauthenticated access to the database.',
     reportedDate: new Date('2025-02-10'),
     assessmentPeriod: 'Q1 2025 Assessment',
+    notes: 'Initial POC was trivial, fix confirmed via re-testing.',
   },
   {
     id: 'find-102',
@@ -82,6 +95,7 @@ const findings: Finding[] = [
     description: 'Reflected XSS discovered in the user profile editing feature. Malicious scripts could be injected via the "bio" field.',
     reportedDate: new Date('2025-02-15'),
     assessmentPeriod: 'Q1 2025 Assessment',
+    notes: 'Requires input sanitization and output encoding. Blocked by WAF, but still exploitable if WAF bypassed.',
   },
   {
     id: 'find-103',
@@ -93,6 +107,7 @@ const findings: Finding[] = [
     description: 'The application is missing several recommended security headers (e.g., X-Content-Type-Options, Strict-Transport-Security).',
     reportedDate: new Date('2025-02-20'),
     assessmentPeriod: 'Q1 2025 Assessment',
+    notes: 'Recommended adding CSP, HSTS, X-Content-Type-Options headers.',
   },
   {
     id: 'find-201',
@@ -104,6 +119,7 @@ const findings: Finding[] = [
     description: 'An IDOR vulnerability allows an authenticated user to view or modify other users\' HR records by manipulating predictable IDs in API requests.',
     reportedDate: new Date('2025-03-10'),
     assessmentPeriod: 'Q1 2025 Audit',
+    notes: 'Impact: Data exposure of employee records. Critical due to sensitive nature of HR data.',
   },
   {
     id: 'find-202',
@@ -115,23 +131,119 @@ const findings: Finding[] = [
     description: 'The system allows users to set weak passwords (e.g., "password123") with no complexity requirements.',
     reportedDate: new Date('2025-03-15'),
     assessmentPeriod: 'Q1 2025 Audit',
+    notes: 'Recommend enforcing minimum length, special characters, and preventing common patterns.',
   },
 ];
 
+const _reports: Report[] = [
+  {
+    id: 'report-001',
+    projectId: 'proj-1',
+    title: 'Acme Corp Web Application - Final Report Q1 2025',
+    type: 'Technical Report',
+    generatedDate: new Date('2025-03-05'),
+    contentSummary: 'Detailed technical report outlining all findings for Acme Corp Web App. Includes PoCs and remediation steps.',
+  },
+  {
+    id: 'report-002',
+    projectId: undefined, // Example of a non-project specific report (e.g., general security audit summary)
+    title: 'Annual Security Review 2024 Summary',
+    type: 'Executive Summary',
+    generatedDate: new Date('2025-01-10'),
+    contentSummary: 'High-level overview of security posture for 2024 across all internal systems.',
+  },
+];
+
+// --- Fake API Functions (Simulating Database Operations) ---
+
+// Simulate a network delay
+const simulateDelay = (ms: number = 300) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Project operations
 export async function getProjects(): Promise<Project[]> {
-  // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 300));
-  return projects;
+  await simulateDelay();
+  return [..._projects]; // Return a copy to prevent direct mutation from outside
 }
 
 export async function getProjectById(id: string): Promise<Project | undefined> {
-  // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 300));
-  return projects.find(p => p.id === id);
+  await simulateDelay();
+  return _projects.find(p => p.id === id);
+}
+
+export async function addProject(newProjectData: Omit<Project, 'id'>): Promise<Project> {
+  await simulateDelay();
+  const newProject: Project = {
+    id: `proj-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`, // More robust unique ID
+    ...newProjectData,
+  };
+  _projects.push(newProject);
+  return newProject;
+}
+
+// Finding operations
+export async function getFindings(): Promise<Finding[]> {
+  await simulateDelay();
+  return [..._findings];
 }
 
 export async function getFindingsByProjectId(projectId: string): Promise<Finding[]> {
-  // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 300));
-  return findings.filter(f => f.projectId === projectId);
+  await simulateDelay();
+  return _findings.filter(f => f.projectId === projectId);
+}
+
+export async function getFindingById(id: string): Promise<Finding | undefined> {
+  await simulateDelay();
+  return _findings.find(f => f.id === id);
+}
+
+export async function addFinding(newFindingData: Omit<Finding, 'id'>): Promise<Finding> {
+  await simulateDelay();
+  const newFinding: Finding = {
+    id: `find-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+    ...newFindingData,
+  };
+  _findings.push(newFinding);
+  return newFinding;
+}
+
+// Report operations
+export async function getReports(): Promise<Report[]> {
+  await simulateDelay();
+  return [..._reports];
+}
+
+export async function getReportById(id: string): Promise<Report | undefined> {
+  await simulateDelay();
+  return _reports.find(r => r.id === id);
+}
+
+export async function addReport(newReportData: Omit<Report, 'id'>): Promise<Report> {
+  await simulateDelay();
+  const newReport: Report = {
+    id: `report-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+    ...newReportData,
+  };
+  _reports.push(newReport);
+  return newReport;
+}
+
+// --- Dashboard Specific Fetching (can combine existing if needed) ---
+export async function getDashboardStats() {
+  await simulateDelay();
+  const totalProjects = _projects.length;
+  const totalFindings = _findings.length;
+  const reportedFindings = _findings.filter(f => f.status === 'Reported').length;
+  const fixedFindings = _findings.filter(f => f.status === 'Fixed').length;
+  const pendingFixes = _findings.filter(f => f.status === 'Pending Fix').length;
+  const completedProjects = _projects.filter(p => p.status === 'Completed').length;
+
+  return {
+    totalProjects,
+    totalFindings,
+    reportedFindings,
+    fixedFindings,
+    pendingFixes,
+    completedProjects,
+    // Add more stats as needed for charts
+  };
 }
