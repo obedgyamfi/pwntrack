@@ -47,6 +47,7 @@ export default function LoginPage() {
                 setError('An unexpected error occurred. Please try again.');
             }
 
+
         } catch (err) {
             setError('An unexpected error occurred. Please try again.');
             console.error('Login error:', err);

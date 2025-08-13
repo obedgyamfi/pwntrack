@@ -27,10 +27,11 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { AlertDialog } from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { format } from 'date-fns';
-import { CalendarIcon, Edit, Plus } from 'lucide-react';
+import { CalendarIcon, Edit, Plus, Trash2 } from 'lucide-react';
 
 // Import reusable components
 import FindingDetailView from '@/components/content/FindingDetailView';

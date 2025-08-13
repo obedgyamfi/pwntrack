@@ -224,6 +224,16 @@ export async function updateFinding(id: string, updatedData: Partial<Omit<Findin
   return undefined;
 }
 
+export async function deleteFinding(id: string): Promise<boolean> {
+  await simulateDelay();
+  const index = _findings.findIndex(f => f.id === id);
+  if (index !== -1) {
+    _findings.splice(index, 1);
+    return true;
+  }
+  return false;
+}
+
 // Report operations
 export async function getReports(): Promise<Report[]> {
   await simulateDelay();

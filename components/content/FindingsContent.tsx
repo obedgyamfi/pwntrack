@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Plus, Bug, Edit } from 'lucide-react'; // Added Edit icon
+import { Plus, Bug, Edit, Trash2 } from 'lucide-react'; // Added Edit icon
 import {
   Table,
   TableBody,
@@ -22,10 +22,22 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger
+} from '@/components/ui/alert-dialog';
+
 import { format } from 'date-fns';
 
 // Import API functions and types
-import { getFindings, Finding, getProjects, Project, addFinding, updateFinding } from '@/lib/dummy-data'; // Import updateFinding
+import { getFindings, Finding, getProjects, Project, addFinding, updateFinding, deleteFinding } from '@/lib/dummy-data'; // Import updateFinding
 
 // Import the reusable FindingDetailView component
 import FindingDetailView from '@/components/content/FindingDetailView';
@@ -37,8 +49,11 @@ const FindingsContent = () => {
   const [isFindingFormDialogOpen, setIsFindingFormDialogOpen] = useState(false); // Controls the FindingFormContent dialog
   const [editingFinding, setEditingFinding] = useState<Finding | undefined>(undefined); // Holds data for the finding being edited
 
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false); // Controls the delete confirmation dialog
+  const [findingToDelete, setFindingToDelete] = useState<Finding | null>(null);
+
   const [isViewFindingDialogOpen, setIsViewFindingDialogOpen] = useState(false);
-  const [selectedFinding, setSelectedFinding] = useState<Finding | null>(null);
+  const [selectedFinding, setSelectedFinding] = useState<Finding | undefined>(undefined);
 
   const [findings, setFindings] = useState<Finding[]>([]);
   const [projectsMap, setProjectsMap] = useState<Map<string, string>>(new Map()); // Map projectId to projectName
@@ -189,6 +204,18 @@ const FindingsContent = () => {
     setIsFindingFormDialogOpen(true); // Open the dialog
   };
 
+  const handleDeleteFinding = async () => {
+    if (!findingToDelete) return;
+
+    try {
+      await deleteFinding(findingToDelete.id); // Call the delete API
+      await fetchFindingsAndProjects(); // Refresh findings list
+      setIsDeleteDialogOpen(false); // Close the delete dialog
+    } catch (error) {
+      console.error("Failed to delete finding:", error);
+    }
+  };
+
   const dialogTitle = editingFinding ? 'Edit Finding' : 'Add New Finding';
   const dialogDescription = editingFinding
     ? `Edit the details for "${editingFinding.title}".`
@@ -229,7 +256,7 @@ const FindingsContent = () => {
 
       {/* Add/Edit Finding Dialog Trigger */}
       <Dialog open={isFindingFormDialogOpen} onOpenChange={setIsFindingFormDialogOpen}>
-        <DialogTrigger asChild>
+        <DialogTrigger >
           <Button onClick={handleAddFindingClick}>
             <Plus className="mr-2 h-4 w-4" /> Add New Finding
           </Button>
@@ -307,6 +334,14 @@ const FindingsContent = () => {
                       <Button variant="ghost" size="sm" onClick={() => handleEditFindingClick(finding)}>
                         <Edit className="h-4 w-4" />
                       </Button>
+                        <AlertDialogTrigger onClick={() => {
+                          setFindingToDelete(finding); 
+                          setIsDeleteDialogOpen(true);
+                          }}>
+                          <Button variant="ghost" size="sm" onClick={() => setFindingToDelete(finding)}>
+                            <Trash2 className='h-4 w-4 text-red-500' />
+                          </Button>
+                        </AlertDialogTrigger>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -336,6 +371,24 @@ const FindingsContent = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+
+      {/* Dialog delete confirmation */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the finding
+              "{findingToDelete?.title}" from the database.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setFindingToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteFinding}>Continue</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
