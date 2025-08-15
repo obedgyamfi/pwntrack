@@ -256,7 +256,7 @@ const FindingsContent = () => {
 
       {/* Add/Edit Finding Dialog Trigger */}
       <Dialog open={isFindingFormDialogOpen} onOpenChange={setIsFindingFormDialogOpen}>
-        <DialogTrigger >
+        <DialogTrigger asChild>
           <Button onClick={handleAddFindingClick}>
             <Plus className="mr-2 h-4 w-4" /> Add New Finding
           </Button>
@@ -329,19 +329,30 @@ const FindingsContent = () => {
                       {finding.affectedEndpoints.join(', ')}
                     </TableCell>
                     <TableCell>{format(finding.reportedDate, 'MMM d, yyyy')}</TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right flex items-center gap-1">
                       <Button variant="ghost" size="sm" onClick={() => handleViewFinding(finding)}>View</Button>
                       <Button variant="ghost" size="sm" onClick={() => handleEditFindingClick(finding)}>
                         <Edit className="h-4 w-4" />
                       </Button>
-                        <AlertDialogTrigger onClick={() => {
-                          setFindingToDelete(finding); 
-                          setIsDeleteDialogOpen(true);
-                          }}>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
                           <Button variant="ghost" size="sm" onClick={() => setFindingToDelete(finding)}>
                             <Trash2 className='h-4 w-4 text-red-500' />
                           </Button>
                         </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This action cannot be undone. This will permanently delete the finding "{findingToDelete?.title}" from the database.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel onClick={() => setFindingToDelete(null)}>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={handleDeleteFinding}>Continue</AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -371,24 +382,6 @@ const FindingsContent = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-
-      {/* Dialog delete confirmation */}
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the finding
-              "{findingToDelete?.title}" from the database.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setFindingToDelete(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteFinding}>Continue</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 };

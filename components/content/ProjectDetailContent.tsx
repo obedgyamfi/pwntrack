@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Project, Finding, addFinding, getFindingsByProjectId, updateProject, getProjectById, updateFinding } from '@/lib/dummy-data'; // Import updateFinding
+import { Project, Finding, addFinding, getFindingsByProjectId, updateProject, getProjectById, updateFinding, deleteFinding } from '@/lib/dummy-data'; // Import updateFinding
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -27,7 +27,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { AlertDialog } from '@/components/ui/alert-dialog';
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel, 
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { format } from 'date-fns';
@@ -86,6 +96,10 @@ const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ initialProj
     endDate: undefined,
     status: 'Planning',
   });
+
+  // States for Delete Finding confirmation dialgog 
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [findingToDelete, setFindingToDelete] = useState<Finding | null>(null);
 
   // Effect to update project and projectFormData states if initialProject prop changes
   useEffect(() => {
@@ -242,6 +256,20 @@ const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ initialProj
   const handleEditFindingClick = (findingToEdit: Finding) => {
     setEditingFinding(findingToEdit); // Set the finding data for the form
     setIsFindingFormDialogOpen(true); // Open the dialog
+  };
+
+  // Handler for deleting a finding 
+  const handleDeleteFinding = async () => {
+    if (!findingToDelete) return ;
+
+    try {
+      await deleteFinding(findingToDelete.id);
+      await fetchProjectFindings(); // Re-fetch findings for this project 
+      setIsDeleteDialogOpen(false); // Reset the finding to delete
+      setFindingToDelete(null); // Reset the finding to delete 
+    } catch(err) {
+      console.error("Failed to delete findings:", err);
+    }
   };
 
   // Handlers for editing project details (from ProjectFormContent)
@@ -465,11 +493,30 @@ const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ initialProj
                         </TableCell>
                         <TableCell>{format(finding.reportedDate, "PPP")}</TableCell>
                         <TableCell>{finding.assessmentPeriod}</TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-right flex items-center gap-1">``
                           <Button variant="ghost" size="sm" onClick={() => handleViewFinding(finding)}>View</Button>
                           <Button variant="ghost" size="sm" onClick={() => handleEditFindingClick(finding)}>
                             <Edit className="h-4 w-4" />
                           </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="sm" onClick={() => setFindingToDelete(finding)}>
+                                <Trash2 className='h-4 w-4 text-red-500'/>
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This action cannot be undone. This will permanently delete the finding "{findingToDelete?.title}" from the database.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel onClick={() => setFindingToDelete(null)}>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={handleDeleteFinding}>Continue</AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -529,6 +576,21 @@ const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ initialProj
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the finding "{findingToDelete?.title}" from the database.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setFindingToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteFinding}>Continue</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
