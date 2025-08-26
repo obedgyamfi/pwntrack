@@ -187,6 +187,19 @@ export async function updateProject(id: string, updatedData: Partial<Omit<Projec
   return undefined;
 }
 
+export async function deleteProject(id: string): Promise<boolean> {
+  await simulateDelay();
+  const index = _projects.findIndex(p => p.id == id);
+  if (index != -1) {
+    _projects.splice(index, 1);
+    // delete associated findings as wel
+    // for now I'll leave it orphaned, but in the real app I'd have 
+    // to delete and nullify project IDs
+    return true;
+  }
+  return false;
+}
+
 
 // Finding operations
 export async function getFindings(): Promise<Finding[]> {

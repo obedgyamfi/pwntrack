@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Project, Finding, addFinding, getFindingsByProjectId, updateProject, getProjectById, updateFinding, deleteFinding } from '@/lib/dummy-data'; // Import updateFinding
+import { useRouter } from 'next/navigation';
+import { Project, Finding, addFinding, getFindingsByProjectId, updateProject, getProjectById, updateFinding, deleteFinding, deleteProject } from '@/lib/dummy-data'; // Import updateFinding
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -27,10 +28,10 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { 
+import {
   AlertDialog,
   AlertDialogAction,
-  AlertDialogCancel, 
+  AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
   AlertDialogFooter,
@@ -61,6 +62,7 @@ const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ initialProj
   const [selectedPeriod, setSelectedPeriod] = useState('');
   const [findings, setFindings] = useState<Finding[]>(initialFindings);
   const [loadingFindings, setLoadingFindings] = useState(false);
+  const router = useRouter();
 
   // States for "Add/Edit Finding" dialog
   const [isFindingFormDialogOpen, setIsFindingFormDialogOpen] = useState(false); // New state for dialog
@@ -97,21 +99,24 @@ const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ initialProj
     status: 'Planning',
   });
 
-  // States for Delete Finding confirmation dialgog 
+  // States for Delete Finding confirmation dialog 
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [findingToDelete, setFindingToDelete] = useState<Finding | null>(null);
+
+  // State for delete Project confrimation dialog
+  const [isDeleteProjectDialogOpen, setIsDeleteProjectDialogOpen] = useState(false);
 
   // Effect to update project and projectFormData states if initialProject prop changes
   useEffect(() => {
     setProject(initialProject);
     setProjectFormData({
-        name: initialProject.name || '',
-        scope: initialProject.scope || '',
-        methodology: initialProject.methodology || '',
-        client: initialProject.client || '',
-        startDate: initialProject.startDate,
-        endDate: initialProject.endDate,
-        status: initialProject.status || 'Planning',
+      name: initialProject.name || '',
+      scope: initialProject.scope || '',
+      methodology: initialProject.methodology || '',
+      client: initialProject.client || '',
+      startDate: initialProject.startDate,
+      endDate: initialProject.endDate,
+      status: initialProject.status || 'Planning',
     });
   }, [initialProject]);
 
@@ -164,8 +169,8 @@ const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ initialProj
   // Filtered findings based on search term and selected period
   const filteredFindings = findings.filter(finding => {
     const matchesSearch = finding.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          finding.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          finding.affectedEndpoints.some(ep => ep.toLowerCase().includes(searchTerm.toLowerCase()));
+      finding.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      finding.affectedEndpoints.some(ep => ep.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesPeriod = selectedPeriod === '' || finding.assessmentPeriod === selectedPeriod;
     return matchesSearch && matchesPeriod;
   });
@@ -260,15 +265,25 @@ const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ initialProj
 
   // Handler for deleting a finding 
   const handleDeleteFinding = async () => {
-    if (!findingToDelete) return ;
+    if (!findingToDelete) return;
 
     try {
       await deleteFinding(findingToDelete.id);
       await fetchProjectFindings(); // Re-fetch findings for this project 
       setIsDeleteDialogOpen(false); // Reset the finding to delete
       setFindingToDelete(null); // Reset the finding to delete 
-    } catch(err) {
+    } catch (err) {
       console.error("Failed to delete findings:", err);
+    }
+  };
+
+  const handleDeleteProject = async () => {
+    try {
+      await deleteProject(project.id);
+      console.log(`Project "${project.name}" deleted.`);
+      router.push('/projects');
+    } catch (err) {
+      console.error("Failed to delete project:", err);
     }
   };
 
@@ -307,6 +322,8 @@ const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ initialProj
       setIsSavingProject(false);
     }
   };
+
+
 
   const projectDialogTitle = "Edit Project";
   const projectDialogDescription = `Edit the details for "${project.name}".`;
@@ -386,7 +403,27 @@ const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ initialProj
             </DialogFooter>
           </DialogContent>
         </Dialog>
-
+        {/* Delete Project Button */}
+        <AlertDialog open={isDeleteProjectDialogOpen} onOpenChange={setIsDeleteProjectDialogOpen}>
+          <AlertDialogTrigger asChild>
+            <Button variant="destructive" onClick={() => setIsDeleteProjectDialogOpen(true)}>
+              <Trash2 className="h-4 w-4 mr-1" /> Delete Project
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete the project
+                "{project.name}" and all its associated data (including findings).
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDeleteProject}>Continue</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
         <Button variant="secondary">Generate Report</Button>
       </div>
 
@@ -501,7 +538,7 @@ const ProjectDetailContent: React.FC<ProjectDetailContentProps> = ({ initialProj
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
                               <Button variant="ghost" size="sm" onClick={() => setFindingToDelete(finding)}>
-                                <Trash2 className='h-4 w-4 text-red-500'/>
+                                <Trash2 className='h-4 w-4 text-red-500' />
                               </Button>
                             </AlertDialogTrigger>
                             <AlertDialogContent>

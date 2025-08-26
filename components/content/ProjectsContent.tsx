@@ -3,16 +3,27 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Plus, Folder, Edit } from 'lucide-react';
+import { Plus, Folder, Edit, Trash2 } from 'lucide-react';
 import {
   Dialog, // Import Dialog
   DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger
+} from '@/components/ui/alert-dialog';
 import Link from 'next/link';
 import { format } from 'date-fns';
 
 // Import the Project type and API functions
-import { Project, getProjects, addProject, updateProject } from '@/lib/dummy-data';
+import { Project, getProjects, addProject, updateProject, deleteProject } from '@/lib/dummy-data';
 
 // Import the reusable ProjectFormContent (renamed from ProjectFormDialog)
 import ProjectFormContent from '@/components/forms/ProjectFormDialog'; // Note: filename is ProjectFormDialog.tsx, but component export is ProjectFormContent
@@ -26,6 +37,9 @@ const ProjectsContent = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  const [isDeleteProjectDialogOpen, setIsDeleteProjectDialogOpen] = useState(false);
+  const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
 
   // State for the form data within ProjectsContent
   const [formData, setFormData] = useState<Omit<Project, 'id'>>({
@@ -139,6 +153,19 @@ const ProjectsContent = () => {
     setIsFormDialogOpen(true); // Open the dialog
   };
 
+  const handleDeleteProject = async () => {
+    if (!projectToDelete) return;
+    try {
+      await deleteProject(projectToDelete.id);
+      await fetchProjects(); //re-fetch to update the list
+      setIsDeleteProjectDialogOpen(false); // close the dialog
+      setProjectToDelete(null); // reset the project to delete
+    } catch (err) {
+      console.error("Failed to delete project:", err);
+      setError("Failed to delete project. Please try again.");
+    }
+  }
+
   const dialogTitle = editingProject ? 'Edit Project' : 'Add New Project';
   const dialogDescription = editingProject
     ? `Edit the details for "${editingProject.name}".`
@@ -211,12 +238,34 @@ const ProjectsContent = () => {
                     </p>
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={() => handleEditProjectClick(project)}>
-                      <Edit className="h-4 w-4 mr-1" /> Edit
-                    </Button>
                     <Link href={`/projects/${project.id}`} passHref>
                       <Button variant="outline" size="sm">View Details</Button>
                     </Link>
+                    <Button variant="outline" size="sm" onClick={() => handleEditProjectClick(project)}>
+                      <Edit className="h-4 w-4 mr-1" /> Edit
+                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="ghost" size="sm" onClick={() => {
+                          setProjectToDelete(project);
+                          setIsDeleteProjectDialogOpen(true);
+                        }}>
+                          <Trash2 className='h-4 w-4 text-red-500' />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This action cannot be undone. This will permanently delete the finding "{projectToDelete?.name}" from the database.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel onClick={() => setProjectToDelete(null)}>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={handleDeleteProject}>Continue</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
                 </div>
               ))}

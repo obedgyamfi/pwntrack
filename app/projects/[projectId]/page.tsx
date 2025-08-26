@@ -24,7 +24,7 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
     name: session.user.name || session.user.email?.split('@')[0],
   };
 
-  const { projectId } = params;
+  const { projectId } = await params;
 
   // Fetch project and findings data on the server
   const project = await getProjectById(projectId); // project will be Project | undefined
