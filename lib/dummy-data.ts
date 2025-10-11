@@ -35,6 +35,10 @@ export interface Report {
   contentSummary: string;
 }
 
+export interface ReportTemplate {
+  // Define fields here if needed
+}
+
 // --- In-Memory Data Stores ---
 const _projects: Project[] = [
   {
@@ -151,6 +155,8 @@ const _reports: Report[] = [
   },
 ];
 
+const _reportTemplate: Report[] = [
+]
 // --- Fake API Functions (Simulating Database Operations) ---
 
 // Simulate a network delay
@@ -287,4 +293,10 @@ export async function getDashboardStats() {
     completedProjects,
     // Add more stats as needed for charts
   };
+}
+
+
+// --- Report Generation Template ---
+export async function getTemplates() {
+  return {};
 }

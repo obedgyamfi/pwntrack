@@ -14,12 +14,34 @@ import {
 } from '@/components/ui/table'; // For reports table
 import { getReports, Report, getProjects } from '@/lib/dummy-data'; // Import API functions and types
 import { format } from 'date-fns';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import ReportFormContent from '@/components/forms/ReportFormDialog';
 
 const ReportsContent = () => {
   const [reports, setReports] = useState<Report[]>([]);
+  const [isReportFormDialogOpen, setReportDialogFormOpen] = useState(false);
   const [projectsMap, setProjectsMap] = useState<Map<string, string>>(new Map()); // Map projectId to projectName
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // // Staet for the form data within ReportContent
+  //   const [formData, setFormData] = useState<Omit<Project, 'id'>>({
+  //   name: '',
+  //   scope: '',
+  //   methodology: '',
+  //   client: '',
+  //   startDate: undefined,
+  //   endDate: undefined,
+  //   status: 'Planning',
+  // });
 
   const fetchReportsAndProjects = useCallback(async () => {
     setLoading(true);
@@ -61,11 +83,30 @@ const ReportsContent = () => {
     );
   }
 
+
   return (
     <div className="p-6 space-y-6">
       <h1 className="text-3xl font-bold">Reports</h1>
       <p className="text-muted-foreground">Generate and manage professional vulnerability reports.</p>
-      <Button><FileText className="mr-2 h-4 w-4" /> Generate New Report</Button>
+
+      {/* <Button><FileText className="mr-2 h-4 w-4" /> Generate New Report</Button> */}
+
+      {/*Button to generate new report */}
+      <Dialog open={isReportFormDialogOpen} onOpenChange={setReportDialogFormOpen}>
+        <DialogTrigger asChild>
+          <Button>
+            <FileText className='mr-2 h-4 w-4' /> Generate New Report
+          </Button>
+        </DialogTrigger>
+        <DialogContent className='sm:max-w-[600px'>
+          <DialogHeader>
+            <DialogTitle>Generate New Report</DialogTitle>
+            <DialogDescription>Generate a comprehensive security report for your projects.</DialogDescription>
+          </DialogHeader>
+       `   <ReportFormContent></ReportFormContent>`
+        </DialogContent>
+      </Dialog>
+
       <Card>
         <CardHeader>
           <CardTitle>Generated Reports</CardTitle>

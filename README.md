@@ -3,6 +3,10 @@
 **PwnTrack** is a lightweight vulnerability management dashboard tailored for **bug bounty hunters** and **security researchers**.
 It enables you to track, triage, and monitor vulnerabilities across multiple projects — all in a **minimal, performant, and secure** interface.
 
+### Video
+![PwnTrack Demo](docs/pwntrack_demo.gif)
+
+### Screenshot
 ![PwnTrack Dashboard](docs/screenshots/dashboard.png)
 
 ---
